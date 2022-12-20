@@ -2,9 +2,9 @@
 //=========================БАЗОВІ НАЛАШТУВАННЯ=================
 
 //РОЛЬ=експериментальний модуль
-#define S_version 2.12
+#define S_version 2.13
 #define comp_date __DATE__
-#define eeprom_size 512
+#define eeprom_size 1024
 #define ONE_WIRE_BUS_PIN 4
 #define led_in_pin 2
 #define sensor_in_pin 16
@@ -260,6 +260,12 @@ EEPROM_READ_WRITE ep_relay_time_on_MINS(476,eeprom_size,0);
 EEPROM_READ_WRITE ep_relay_time_off_HR(480,eeprom_size,0);
 EEPROM_READ_WRITE ep_relay_time_off_MINS(484,eeprom_size,0);
 
+EEPROM_READ_WRITE ep_caller_count(500,eeprom_size,0);
+EEPROM_READ_WRITE ep_caller_1(504,eeprom_size,0);
+EEPROM_READ_WRITE ep_caller_2(536,eeprom_size,0);
+EEPROM_READ_WRITE ep_caller_3(568,eeprom_size,0);
+EEPROM_READ_WRITE ep_caller_4(600,eeprom_size,0);
+
 tTimer timer0(1,true,time_flow_0);
 tTimer timer1(1*1000,true,time_flow_1);
 tTimer timer2(1000*1000,true,time_flow_2); 
@@ -273,7 +279,6 @@ device_one_pin wifi_enable(wifi_off_pin,'P');
 device_one_pin ap_mode(ap_mode_pin,'P');
 
 //=====================ГЛОБАЛЬНІ ЗМІННІ=============================
-
 unsigned long system_unix_type = 0;
 int max_relay_time,countSensors,alert,fireMsg,sysOk,INTERNET,session_timeout,c_t_sensors = 0;
 volatile int relay_on_timer = 0;
@@ -295,6 +300,9 @@ float h_voltage=0;
 float temperature[10],h_temperature;
 int timers[6]; //sec,min,hour,days,mounth,year
 int unx_timers[4] = {0,0,0,0};
+int caller_count = 0; 
+int caller_timer[4] = {60,60,60,60};
+String caller_adr[4];
 
 //=====================ФУНКЦІЇ ЧАСУ=============================
 void timecalculate_unx(){
@@ -420,7 +428,27 @@ void html_commands(){
     saved_pass=new_pass;
     user_pass=new_pass;
     ep_saved_pass.EEPROM_WRITE_STRING(new_pass);
-    }     
+    }  
+    if (Wserver.arg("caller_counts")!="") {
+    caller_count=Wserver.arg("caller_counts").toInt();
+    ep_caller_count.EEPROM_WRITE_SV(caller_count);
+    }  
+    if (Wserver.arg("caller1")!="") {
+    caller_adr[0]=Wserver.arg("caller1");
+    ep_caller_1.EEPROM_WRITE_STRING(caller_adr[0]);
+    } 
+    if (Wserver.arg("caller2")!="") {
+    caller_adr[1]=Wserver.arg("caller2");
+    ep_caller_2.EEPROM_WRITE_STRING(caller_adr[1]);
+    }
+    if (Wserver.arg("caller3")!="") {
+    caller_adr[2]=Wserver.arg("caller3");
+    ep_caller_3.EEPROM_WRITE_STRING(caller_adr[2]);
+    }
+    if (Wserver.arg("caller4")!="") {
+    caller_adr[3]=Wserver.arg("caller4");
+    ep_caller_4.EEPROM_WRITE_STRING(caller_adr[3]);
+    }
     //---   
     if (Wserver.arg("relay_time_on_HR")!="") { //relay_time_on_HR
     relay_time_on_HR=Wserver.arg("relay_time_on_HR").toInt();
@@ -611,7 +639,17 @@ if (user_pass==saved_pass){
   }
   if (page=="security_settings"){  //тіло сторінки 
     ts=ts+"Current SECURITY PASSWORD:******** <br>";     
-    ts=ts+add_text_field("CHANGE PASSWORD:","new_pass","Save")+"<br><br>";   
+    ts=ts+add_text_field("CHANGE PASSWORD:","new_pass","Save")+"<br><br>";
+    ts=ts+"Current CALLER [LOGIC CENTRAL FUNCTION] COUNTS:"+String(caller_count)+"<br>";  
+    ts=ts+add_text_field("ACTIVATE CALLERS:","caller_counts","Save")+"<br>";
+    ts=ts+"Current:"+String(caller_adr[0])+"<br>"; 
+    ts=ts+add_text_field("CHANGE CALLER1:","caller1","Save")+"<br>"; 
+    ts=ts+"Current:"+String(caller_adr[1])+"<br>";  
+    ts=ts+add_text_field("CHANGE CALLER2:","caller2","Save")+"<br>"; 
+    ts=ts+"Current:"+String(caller_adr[2])+"<br>"; 
+    ts=ts+add_text_field("CHANGE CALLER3:","caller3","Save")+"<br>"; 
+    ts=ts+"Current:"+String(caller_adr[3])+"<br>"; 
+    ts=ts+add_text_field("CHANGE CALLER4:","caller4","Save")+"<br><br>"; 
     ts=ts+add_button("To Main","/?page=home")+"<br>";    
   }
   if (page=="pins_settings"){  //тіло сторінки 
@@ -709,6 +747,21 @@ void time_flow_2(){ //1second
   timecalculate_unx();
   timecalculate_ntp();
   system_unix_type++; 
+  if (caller_count>0){   // logical central zone
+    for (int i=0; i<caller_count; i++){
+      if (caller_timer[i]>0 and caller_adr[i]!=""){caller_timer[i]--;}
+    }
+    for (int i=0; i<caller_count; i++){
+     if (caller_timer[i]<5 and caller_adr[i]!="") {if (sendmesage("",caller_adr[i],false)==200){caller_timer[i]=60;}}
+    }
+    for (int i=0; i<caller_count; i++){
+      if (caller_timer[i]<=0 and caller_adr[i]!=""){
+        for (int ii=0; ii<5; ii++) {if (sendmesage("offline:"+caller_adr[i],web_url,true)==200) {ii=5;}}
+        caller_timer[i]=alert_timeout;
+      }
+    }
+  Serial.println("Callers status["+String(caller_timer[0])+","+String(caller_timer[1])+","+String(caller_timer[2])+","+String(caller_timer[3])+"]");
+  }
   }
   
 void time_flow_3(){ //1second
@@ -809,6 +862,12 @@ ep_relay_time_on_HR.EEPROM_WRITE_SV(-1);
 ep_relay_time_on_MINS.EEPROM_WRITE_SV(-1);
 ep_relay_time_off_HR.EEPROM_WRITE_SV(-1);
 ep_relay_time_off_MINS.EEPROM_WRITE_SV(-1);
+
+ep_caller_count.EEPROM_WRITE_SV(1);
+ep_caller_1.EEPROM_WRITE_STRING("http://192.168.0.206");
+ep_caller_2.EEPROM_WRITE_STRING("");
+ep_caller_3.EEPROM_WRITE_STRING("");
+ep_caller_4.EEPROM_WRITE_STRING("");
 */
 //normal init  
 Serial.begin(9600);
@@ -840,7 +899,12 @@ ssid_name=eEPROM_ssid.EEPROM_READ_STRING();
 ssid_pass=eEPROM_pass.EEPROM_READ_STRING();
 ssid_name_ap=eEPROM_ssid_ap.EEPROM_READ_STRING();
 ssid_pass_ap=eEPROM_pass_ap.EEPROM_READ_STRING();
-//web services on
+caller_count=ep_caller_count.EEPROM_READ_INT();
+if (caller_count>0) {caller_adr[0]=ep_caller_1.EEPROM_READ_STRING();}
+if (caller_count>1) {caller_adr[1]=ep_caller_2.EEPROM_READ_STRING();}
+if (caller_count>2) {caller_adr[2]=ep_caller_3.EEPROM_READ_STRING();}
+if (caller_count>3) {caller_adr[3]=ep_caller_4.EEPROM_READ_STRING();}
+//web services
 wifi_enable.ReadPin();
 ap_mode.ReadPin();
 sensors.begin();
