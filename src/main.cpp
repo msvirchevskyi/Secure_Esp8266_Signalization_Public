@@ -262,9 +262,9 @@ EEPROM_READ_WRITE ep_relay_time_off_MINS(484,eeprom_size,0);
 
 EEPROM_READ_WRITE ep_caller_count(500,eeprom_size,0);
 EEPROM_READ_WRITE ep_caller_1(504,eeprom_size,0);
-EEPROM_READ_WRITE ep_caller_2(536,eeprom_size,0);
-EEPROM_READ_WRITE ep_caller_3(568,eeprom_size,0);
-EEPROM_READ_WRITE ep_caller_4(600,eeprom_size,0);
+EEPROM_READ_WRITE ep_caller_2(568,eeprom_size,0);
+EEPROM_READ_WRITE ep_caller_3(632,eeprom_size,0);
+EEPROM_READ_WRITE ep_caller_4(696,eeprom_size,0);
 
 tTimer timer0(1,true,time_flow_0);
 tTimer timer1(1*1000,true,time_flow_1);
